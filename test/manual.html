@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>DubDub manual harness</title>
+</head>
+<body>
+  <h1>The quick brown fox jumps over the lazy dog</h1>
+  <p id="para">Hello world, this is a simple paragraph for testing DubDub.</p>
+  <textarea>Text inside a textarea must stay untouched.</textarea>
+  <button id="add-dynamic">Add dynamic content</button>
+  <button id="toggle-enabled">Toggle enabled</button>
+  <div id="dynamic-host"></div>
+  <pre id="result"></pre>
+
+  <script>
+    // Stub just enough of the chrome extension APIs for content.js to run
+    // outside of an actual extension context, with real (in-memory)
+    // storage + change events so toggling can be exercised from a button.
+    const state = { enabled: true, exceptions: [] };
+    const listeners = [];
+    window.chrome = {
+      storage: {
+        sync: {
+          get: (defaults) => Promise.resolve({ ...defaults, ...state }),
+          set: (patch) => {
+            const changes = {};
+            for (const [k, v] of Object.entries(patch)) {
+              changes[k] = { newValue: v, oldValue: state[k] };
+              state[k] = v;
+            }
+            for (const l of listeners) l(changes, "sync");
+            return Promise.resolve();
+          },
+        },
+        onChanged: { addListener: (fn) => listeners.push(fn) },
+      },
+    };
+  </script>
+  <script src="../dub.js"></script>
+  <script src="../content.js"></script>
+  <script>
+    document.getElementById("add-dynamic").addEventListener("click", () => {
+      const p = document.createElement("p");
+      p.textContent = "Freshly injected sentence to test the MutationObserver.";
+      document.getElementById("dynamic-host").appendChild(p);
+    });
+    document.getElementById("toggle-enabled").addEventListener("click", () => {
+      chrome.storage.sync.set({ enabled: !state.enabled });
+    });
+  </script>
+</body>
+</html>
