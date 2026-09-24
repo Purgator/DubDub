@@ -11,9 +11,18 @@
   ]);
   const HAS_LETTER_RE = /\p{L}/u;
 
-  // Original text per node, so disabling restores the page exactly and
-  // re-enabling doesn't need to re-derive anything.
+  // Text that lives in an attribute rather than a text node — e.g. a search
+  // box's placeholder — is invisible to a text-node walk, but it's still
+  // words the user reads, so it gets dubbed the same way. Deliberately
+  // excludes "value": that can be real data the user (or the page) put
+  // there, not UI chrome.
+  const ATTR_NAMES = ["placeholder", "title", "aria-label", "alt"];
+  const ATTR_SELECTOR = ATTR_NAMES.map((a) => `[${a}]`).join(",");
+
+  // Original text per node/attribute, so disabling restores the page
+  // exactly and re-enabling doesn't need to re-derive anything.
   const originals = new Map();
+  const originalAttrs = new Map(); // element -> Map(attrName -> original value)
   let enabled = false;
   let observer = null;
 
@@ -53,6 +62,49 @@
     }
   }
 
+  // Same idempotence trick as ensureDubbed, one attribute at a time. Note:
+  // no isSkippable(el) guard here — SKIP_TAGS exists to protect real
+  // content inside inputs/textareas, but placeholder/title/aria-label/alt
+  // are UI hints on exactly those elements, and are meant to be dubbed.
+  function ensureDubbedAttr(el, attr) {
+    const raw = el.getAttribute(attr);
+    if (!raw || !HAS_LETTER_RE.test(raw)) return;
+
+    let store = originalAttrs.get(el);
+    if (!store) {
+      store = new Map();
+      originalAttrs.set(el, store);
+    }
+    let original = store.get(attr);
+    if (original === undefined || raw !== dubText(original)) {
+      original = raw;
+      store.set(attr, original);
+    }
+    const dubbed = dubText(original);
+    if (el.getAttribute(attr) !== dubbed) el.setAttribute(attr, dubbed);
+  }
+
+  function ensureDubbedAttrs(el) {
+    for (const attr of ATTR_NAMES) {
+      if (el.hasAttribute(attr)) ensureDubbedAttr(el, attr);
+    }
+  }
+
+  function restoreAttrs(el) {
+    const store = originalAttrs.get(el);
+    if (!store) return;
+    for (const [attr, original] of store) {
+      if (el.getAttribute(attr) !== original) el.setAttribute(attr, original);
+    }
+  }
+
+  function collectAttrElements(root) {
+    if (!(root instanceof Element)) return [];
+    const list = ATTR_NAMES.some((a) => root.hasAttribute(a)) ? [root] : [];
+    list.push(...root.querySelectorAll(ATTR_SELECTOR));
+    return list;
+  }
+
   function collectTextNodes(root) {
     const nodes = [];
     if (root.nodeType === Node.TEXT_NODE) {
@@ -68,12 +120,18 @@
   // Spreads a big list of nodes over idle time so a huge page never blocks
   // the main thread in one long task (smooth scrolling, no jank, no drain).
   function scheduleWork(nodes, action) {
+    if (nodes.length === 0) return;
     let i = 0;
     function runChunk(deadline) {
       const hasDeadline = deadline && typeof deadline.timeRemaining === "function";
-      while (i < nodes.length && (!hasDeadline || deadline.timeRemaining() > 0)) {
+      // Always process at least one item per callback: if the browser ever
+      // reports ~0 idle time on every callback (seen on some pages/tabs),
+      // a plain "while there's time left" loop would reschedule forever
+      // without ever doing any work. One guaranteed item per tick means
+      // it always finishes, just maybe gradually instead of in one pass.
+      do {
         action(nodes[i++]);
-      }
+      } while (i < nodes.length && (!hasDeadline || deadline.timeRemaining() > 0));
       if (i < nodes.length) scheduleNext();
     }
     function scheduleNext() {
@@ -90,8 +148,10 @@
     enabled = next;
     if (enabled) {
       scheduleWork(collectTextNodes(document.body), ensureDubbed);
+      scheduleWork(collectAttrElements(document.body), ensureDubbedAttrs);
     } else {
       for (const node of originals.keys()) restoreNode(node);
+      for (const el of originalAttrs.keys()) restoreAttrs(el);
     }
   }
 
@@ -115,6 +175,7 @@
         ensureDubbed(node);
       } else if (node.nodeType === Node.ELEMENT_NODE) {
         scheduleWork(collectTextNodes(node), ensureDubbed);
+        scheduleWork(collectAttrElements(node), ensureDubbedAttrs);
       }
     }
   }
@@ -126,7 +187,7 @@
       for (const m of mutations) {
         if (m.type === "childList") {
           for (const node of m.addedNodes) pending.add(node);
-        } else if (m.type === "characterData") {
+        } else if (m.type === "characterData" || m.type === "attributes") {
           pending.add(m.target);
         }
       }
@@ -140,6 +201,8 @@
       childList: true,
       subtree: true,
       characterData: true,
+      attributes: true,
+      attributeFilter: ATTR_NAMES,
     });
   }
 
