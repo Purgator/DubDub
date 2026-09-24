@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <img src="icons/icon48.png" alt="" width="24" height="24" />
+    <h1>DubDub</h1>
+  </header>
+
+  <section id="perm-banner" hidden>
+    <p>DubDub needs access to websites to translate them. Your browser requires you to grant it explicitly.</p>
+    <button id="grant-perms">Grant access</button>
+    <p class="muted small">Already-open tabs need a reload afterwards.</p>
+  </section>
+
+  <section id="global-toggle-section">
+    <label class="switch-row">
+      <span>Enabled everywhere</span>
+      <input type="checkbox" id="global-toggle" />
+    </label>
+  </section>
+
+  <section id="current-site" hidden>
+    <p class="site-name" id="site-name"></p>
+    <button id="toggle-site"></button>
+  </section>
+
+  <section id="translator-section">
+    <h2>Translate to DubDub</h2>
+    <textarea id="translator-input" maxlength="140" rows="2" placeholder="Type a word or a short sentence…"></textarea>
+    <p class="counter"><span id="translator-count">0</span>/140</p>
+    <div id="translator-output" class="translator-output" aria-live="polite"></div>
+    <button id="copy-output" class="secondary" hidden>Copy</button>
+  </section>
+
+  <section id="exceptions-section">
+    <h2>Disabled on</h2>
+    <ul id="exception-list"></ul>
+    <p id="empty-note" class="muted">No exceptions — DubDub is active everywhere it's enabled.</p>
+  </section>
+</body>
+<script src="dub.js"></script>
+<script src="popup.js"></script>
+</html>
