@@ -33,7 +33,7 @@ DubDub isn't on the Chrome Web Store, so it installs from a release ZIP — it o
 **Step 1 — Download**
 
 - Go to the [**latest release**](https://github.com/Purgator/DubDub/releases/latest).
-- Under **Assets**, click **DubDub.zip** — it lands in your Downloads folder.
+- Under **Assets**, click **DubDub-chrome.zip** — it lands in your Downloads folder.
 
 **Step 2 — Unzip it somewhere permanent**
 
@@ -56,11 +56,11 @@ DubDub isn't on the Chrome Web Store, so it installs from a release ZIP — it o
 
 ### Firefox
 
-DubDub also works on Firefox (121+) as a temporary add-on: open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on…**, and select the ZIP (no need to unzip). Firefox doesn't grant website access at install time, so open the DubDub popup and click **Grant access** once — and reload any tabs that were already open. Temporary add-ons are removed when Firefox restarts.
+DubDub also works on Firefox (121+), with its own download: **DubDub-firefox.zip** under the Assets of the [latest release](https://github.com/Purgator/DubDub/releases/latest). It loads as a temporary add-on: open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on…**, and select **DubDub-firefox.zip** (no need to unzip). Firefox doesn't grant website access at install time, so open the DubDub popup and click **Grant access** once — and reload any tabs that were already open. Temporary add-ons are removed when Firefox restarts.
 
 ## For developers
 
-DubDub is plain Manifest V3, no build step, no dependencies.
+DubDub is plain Manifest V3, no dependencies; the cloned folder loads unpacked as-is.
 
 ```bash
 git clone https://github.com/Purgator/DubDub.git
@@ -77,10 +77,19 @@ Then load the cloned folder as an unpacked extension (`chrome://extensions` → 
 | `content.js` | Walks the page's text nodes, dubs them, restores them when disabled, watches for DOM changes |
 | `popup.html/css/js` | Toolbar popup: global toggle, per-site toggle, translator, exception list |
 | `icons/` | Extension icons |
+| `scripts/build.js` | Builds the per-browser release ZIPs into `dist/` (see below) |
 | `tools/gen-icons.js` | Regenerates `icons/*.png` from code (zero dependencies) — run `node tools/gen-icons.js` after changing it |
 | `test/test.js` | Unit tests for `dub.js` — run `node test/test.js` (or `npm test` from `test/`) |
 | `test/manual.html` | Manual harness to eyeball `content.js` in a real page (dubbing, disable/restore, dynamic content) without loading the actual extension |
 | `test/popup-harness.html` | Same idea for the popup, with the `chrome.*` APIs stubbed |
+
+### Building the release ZIPs
+
+```bash
+node scripts/build.js
+```
+
+Produces `dist/DubDub-chrome.zip` and `dist/DubDub-firefox.zip` (no dependencies, Node 22+). The source `manifest.json` carries both browsers' keys so the repo folder loads unpacked anywhere; each ZIP keeps only the keys its browser needs.
 
 ### Settings
 
